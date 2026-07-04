@@ -1,0 +1,93 @@
+﻿@page "/"
+
+@using System.Net.Http.Json
+@inject HttpClient Http
+
+<PageTitle>Subscriptions</PageTitle>
+
+<h1>RSS Feed Subscriptions</h1>
+
+<p>Add a feed URL to start tracking it.</p>
+
+<EditForm Model="_model" OnValidSubmit="HandleSubmit">
+    <InputText class="form-control" @bind-Value="_model.FeedUrl" placeholder="https://example.com/feed" />
+    <button class="btn btn-primary mt-2" type="submit">Add subscription</button>
+</EditForm>
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger mt-3">@_error</div>
+}
+
+@if (_subscriptions is null)
+{
+    <p class="mt-3">Loading subscriptions...</p>
+}
+else if (_subscriptions.Count == 0)
+{
+    <p class="mt-3">No subscriptions yet.</p>
+}
+else
+{
+    <ul class="mt-3">
+        @foreach (var subscription in _subscriptions)
+        {
+            <li>@subscription.FeedUrl</li>
+        }
+    </ul>
+}
+
+@code {
+    private readonly SubscriptionInput _model = new();
+    private List<SubscriptionItem>? _subscriptions;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSubscriptions();
+    }
+
+    private async Task HandleSubmit()
+    {
+        _error = null;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("subscriptions", new { feedUrl = _model.FeedUrl });
+            if (!response.IsSuccessStatusCode)
+            {
+                _error = await response.Content.ReadAsStringAsync();
+                return;
+            }
+
+            _model.FeedUrl = string.Empty;
+            await LoadSubscriptions();
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task LoadSubscriptions()
+    {
+        try
+        {
+            _subscriptions = await Http.GetFromJsonAsync<List<SubscriptionItem>>("subscriptions");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private class SubscriptionInput
+    {
+        public string? FeedUrl { get; set; }
+    }
+
+    private class SubscriptionItem
+    {
+        public string? Id { get; set; }
+        public string? FeedUrl { get; set; }
+    }
+}
